@@ -1,0 +1,6 @@
+[submodule "da-vinci-assist-frontend"]
+	path = da-vinci-assist-frontend
+	url = https://github.com/Faniry-lang/da-vinci-assist-frontend.git
+[submodule "da-vinci-assist-backend"]
+	path = da-vinci-assist-backend
+	url = https://github.com/Faniry-lang/da-vinci-assist-backend.git
