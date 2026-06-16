@@ -1,0 +1,214 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "member-registration-google-form",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -80,
+        -64
+      ],
+      "id": "3694e79c-19df-4f30-a987-4095f4bd8801",
+      "name": "OnGoogleFormSubmit",
+      "webhookId": "5fdcea60-98dc-4afc-8ba1-9310f97a73e5"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "registration-all-from-google-form",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -224,
+        112
+      ],
+      "id": "a4a75a61-7b51-46d4-82ee-33e60d15ffe4",
+      "name": "OnWebAppSubmit",
+      "webhookId": "7f0654ed-2e5b-4472-ac52-9236db1316b7"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/10x99a-n3459O0y3OXFanPd6jAq2sGQuddAW-jpGpRSs/edit?usp=sharing",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 838590109,
+          "mode": "list",
+          "cachedResultName": "Réponses au formulaire 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/10x99a-n3459O0y3OXFanPd6jAq2sGQuddAW-jpGpRSs/edit#gid=838590109"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -32,
+        176
+      ],
+      "id": "e079eef3-c78c-43a8-b62a-4a7fdf0aaaf9",
+      "name": "GetRowsFromGoogleFormSheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "MYGjKN4MzLcRqgCd",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "function cleanEtu(value) {\n    if (!value) return null;\n\n    const match = String(value).match(/(\\d+)/);\n\n    return match\n        ? parseInt(match[1], 10)\n        : null;\n}\n\nfunction cleanPromotion(value) {\n    if (!value) return null;\n\n    const match = String(value).match(/(\\d+)/);\n\n    if (!match) {\n        return null;\n    }\n\n    const promoNum = parseInt(match[1], 10);\n\n    return promoNum < 17\n        ? `DS P${promoNum}`\n        : `INF P${promoNum}`;\n}\n\nfunction cleanRegistrationDate(value) {\n    if (!value) {\n        return null;\n    }\n\n    const match = String(value).match(\n        /^(\\d{2})\\/(\\d{2})\\/(\\d{4})/\n    );\n\n    if (!match) {\n        return null;\n    }\n\n    const [, day, month, year] = match;\n\n    return `${year}-${month}-${day}`;\n}\n\nconst registrations = items.map(item => {\n\n    const data = item.json.body ?? item.json;\n\n    return {\n        registrationDate: cleanRegistrationDate(\n            data[\"Horodateur\"]\n        ),\n\n        fullName:\n            data[\"Nom et prénom\"]?.trim() ?? null,\n\n        etu: cleanEtu(\n            data[\"ETU (ex: 3173)\"]\n        ),\n\n        promotion: cleanPromotion(\n            data[\"Promotion (ex: DS P5, INF P9-A)\"]\n        ),\n\n        email:\n            data[\"Email\"]?.trim().toLowerCase() ?? null,\n\n        registrationActivityName:\n            data[\"Parmi les domaines suivants, lequel vous intéresse le plus? \"] ??\n            data[\"Parmi les domaines suivants, lequel vous intéresse le plus?\"] ??\n            null,\n\n        registrationActivityLevelString:\n            data[\"Précisez votre niveau\"] ?? null,\n\n        facebookProfileLink:\n            data[\"Lien vers votre compte facebook\"] ?? null,\n\n        registrationInterest:\n            data[\"Pourquoi avez vous choisi d'intégrer le club d'art? :D\"] ?? null\n    };\n});\n\n// Suppression des doublons par ETU\nconst seenEtu = new Set();\n\nconst uniqueRegistrations = registrations.filter(registration => {\n\n    // On garde les lignes sans ETU\n    if (registration.etu === null) {\n        return true;\n    }\n\n    if (seenEtu.has(registration.etu)) {\n        return false;\n    }\n\n    seenEtu.add(registration.etu);\n    return true;\n});\n\nreturn [\n    {\n        json: {\n            registrations: uniqueRegistrations\n        }\n    }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        96
+      ],
+      "id": "0f8c1247-df82-4442-ac2e-373adcb15b27",
+      "name": "CleanRawData"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://da-vinci-assist-backend.onrender.com/api/memberships/member-from-json",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.registrations}}",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        464,
+        80
+      ],
+      "id": "550b7cbd-074c-4c36-9148-4adbfe5000d7",
+      "name": "PostRegistrations",
+      "alwaysOutputData": false,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const now = new Date().toISOString();\n\nconst isError = items.some(item => item.json?.error);\n\nif (isError) {\n  const result = items.map(item => {\n    return {\n      json: {\n        type: \"error\",\n        message: \"Erreur lors de l'orchestration des inscriptions\",\n        details: JSON.stringify(item.json.error ?? item.json),\n        date: now\n      }\n    };\n  });\n\n  return result;\n}\n\nreturn items.map(item => {\n  return {\n    json: {\n      type: \"success\",\n      message: \"Inscription(s) orchestrée(s) avec succès!\",\n      details: JSON.stringify(item.json),\n      date: now\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        656,
+        208
+      ],
+      "id": "62db49ac-9faf-42fa-b341-270b935e8e00",
+      "name": "BuildNotificationObject"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://da-vinci-assist-backend.onrender.com/api/notification",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        864,
+        208
+      ],
+      "id": "b1120f1f-393f-4aff-8bb3-50f5fb0d7eba",
+      "name": "PostNotifications"
+    }
+  ],
+  "connections": {
+    "OnGoogleFormSubmit": {
+      "main": [
+        [
+          {
+            "node": "CleanRawData",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OnWebAppSubmit": {
+      "main": [
+        [
+          {
+            "node": "GetRowsFromGoogleFormSheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetRowsFromGoogleFormSheet": {
+      "main": [
+        [
+          {
+            "node": "CleanRawData",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CleanRawData": {
+      "main": [
+        [
+          {
+            "node": "PostRegistrations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PostRegistrations": {
+      "main": [
+        [
+          {
+            "node": "BuildNotificationObject",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BuildNotificationObject": {
+      "main": [
+        [
+          {
+            "node": "PostNotifications",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "16ac12540e1e7d9ce9f531f2f610da3dce7f28856fc788589d91bc12c61be437"
+  }
+}
